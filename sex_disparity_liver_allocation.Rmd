@@ -1,0 +1,376 @@
+---
+title: "Sex disparity under a fair medical urgency score"
+author: "Hans de Ferrante"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+pacman::p_load(coxed, ggplot2, tibble, dplyr, stringr, here, purrr, kableExtra, data.table)
+options(digits=2)
+source(here('settings.R'))
+set.seed(1)
+```
+
+In this notebook, we illustrate with simulation that sex disparity in liver waitlist 
+outcomes can persist, even if prioritization of waitlist candidates is based on a
+medical urgency score which by itself makes unbiased predictions of 
+pre-transplant mortality in males and females. 
+
+To this end, we generate realistic populations of liver transplantation candidates
+and donors. Pre-transplant survival is simulated to depend only on MELD.
+To allocate the donor livers to patients, we prioritize candidates on MELD. Thus, we allocate solely on a medical urgency score which is not biased against females.
+
+However, we assume that females are less likely to accept liver graft offers.
+We show that this results in substantial sex disparities in waitlist outcomes, with
+females being both less likely to be transplanted than males, and more likely to die on the waitlist. We then show that when a Cox proportional hazards model is fitted to the observed data with waitlist mortality as the outcome and female sex and MELD as adjustment variables, female sex is insignificant. We explain why this is expected.
+
+The conclusions of this are that (i) using a Cox proportional hazards model
+for waitlist mortality is a suitable approach to develop unbiased scores for medical
+urgency, but (ii) scores developed in such a way (MELD 3.0 and GEMA-Na) cannot
+correct for disparities which are the result of inequities in accessing transplantation.
+
+# Simulation settings
+
+```{r}
+# Settings for simulations
+NUMBER_YEARS_SIMULATED <- 10
+TIME_HORIZON <- NUMBER_YEARS_SIMULATED*365
+NUMBER_OF_CANDIDATES_PER_YEAR <- 1700
+TOTAL_NUMBER_OF_CANDIDATES <- NUMBER_OF_CANDIDATES_PER_YEAR*NUMBER_YEARS_SIMULATED
+```
+
+
+# Simulation of pre-transplant survival in absence of transplantation
+
+First, we simulate pre-transplant survival for candidates based on a
+MELD survival curve, and generate candidate sex independently from these survival times.
+MELD thus provides an unbiased estimation of waitlist mortality risks for
+males and females.
+
+```{r simulate pre-transplant survival}
+# Simulate MELD scores according to the empirical distribution of MELD 
+# at listing in Eurotransplant
+MELD_SCORES <- data.frame(
+  meld_lab = sample(
+    as.numeric(names(EMPIRICAL_DISTRIBUTION_MELD)), 
+    prob=EMPIRICAL_DISTRIBUTION_MELD,
+    size=TOTAL_NUMBER_OF_CANDIDATES, 
+    replace=TRUE)
+)
+hist(MELD_SCORES)
+
+# We simulate survival based on proportional hazards model. The marginal effect 
+# of MELD is set to 0.18 and we use a constant hazard function. 
+# These parameters were chosen to correspond well to actual waitlist survival 
+# by MELD in Eurotransplant.
+sim <- sim.survdata(
+  N=TOTAL_NUMBER_OF_CANDIDATES, 
+  `T`=TIME_HORIZON+1,
+  num.data.frames = 1,
+  X=MELD_SCORES-18,
+  hazard.fun = function(t) {0.0010954},
+  beta = 0.18
+)
+simdata <- sim$data
+simdata$meld_lab <- simdata$meld_lab + 18
+
+# Plot 90-day survival, estimated with Kaplan-Meier for these MELD scores.
+sfit <- survfit(
+  Surv(y, failed) ~ meld_lab,
+  data=simdata
+)
+
+df_surv <- summary(sfit)[
+  c('time', 'surv', 'strata', 'lower', 'upper')
+  ] |>
+  as_tibble() |>
+  mutate(
+    meld_lab = str_extract(strata, '(?<=meld_lab=).+') |> factor() |> forcats::fct_inorder()
+  ) |>
+  filter(meld_lab %in% c(6, 15, 20, 25, 30, 35, 40))
+
+ggplot(
+  df_surv,
+  aes(x = time, y = surv, ymin = lower, ymax = upper, col=meld_lab) 
+) +
+  geom_step() +
+  geom_ribbon(alpha = 0.05) +
+  xlim(c(0, 365)) +
+  ggokabeito::scale_color_okabe_ito() +
+  guides(col = guide_legend('MELD score')) +
+  ylab('Pre-transplant survival probability (%)') +
+  xlab('Days after registration') +
+  theme_bw()
+```
+
+Now simulate other patient characteristics, independently of MELD / survival. Thus, MELD is still a medical urgency score without sex bias.
+
+```{r}
+simdata$candidate_bloodgroup <- sample(
+  factor(names(BLOOD_TYPE_FREQUENCIES)), size = nrow(simdata),
+  BLOOD_TYPE_FREQUENCIES, replace=TRUE
+)
+simdata$candidate_sex <- factor(
+  sample(x=c('Male', 'Female'), size=nrow(simdata), prob = c(0.36, 0.64), replace=TRUE),
+  levels = c('Male', 'Female')
+)
+simdata$candidate_country <- sample(factor(1:7), size = nrow(simdata), prob = P_COUNTRY_RATES, replace=TRUE)
+summary(simdata)
+```
+This completes the simulated patient data. For each patient, we have:
+  1) a MELD score (`meld_lab`),
+  2) a time-to-failure (`y`) which was simulated based on the MELD score,
+  3) a death indicator (`failed`),
+  4) a candidate sex,
+  5) a candidate blood group
+  6) a candidate country of listing
+
+# Simulate a donor population
+
+Secondly, we simulate a donor population. We simulate a donor shortage of 30%.
+We assume that donors are uniformly distributed over the 10 years of simulation.
+We also randomly draw blood groups and countries for the donor.
+
+```{r}
+# Simulate donors. Assume that there is a donor shortage of 30%. Also assume
+# that donors are reported uniformly over the simulation period.
+NUMBER_OF_DONORS <- 0.70 * TOTAL_NUMBER_OF_CANDIDATES
+donor_data = data.frame(
+  bloodgroups_donor = sample(
+    factor(names(BLOOD_TYPE_FREQUENCIES)),
+    size = NUMBER_OF_DONORS,
+    BLOOD_TYPE_FREQUENCIES,
+    replace=TRUE
+  ),
+  donor_countries = sample(
+    factor(1:7), size = NUMBER_OF_DONORS, prob = D_COUNTRY_RATES, 
+    replace=TRUE)
+)
+
+summary(donor_data)
+```
+
+# Construct a waiting list consisting of all pre-transplant candidates
+
+Here, we generate candidate listing and delisting times. These are defined in the number of days relative to the simulation start time. For instance, a listing time of 10 and death time of 140 means that this candidate was activated on the waitlist on day 10 of the simulation, and would die 130 (140-10) days after listing unless transplanted.
+
+We sort the complete list of candidates descendingly by MELD. This order is used to determine the sequence in which candidates are offered the liver graft.
+
+```{r}
+# Assume that the initial waitlist size is 70% of the total number
+# of candidates reported per year
+INITIAL_WAITLIST_SIZE = .70*NUMBER_OF_CANDIDATES_PER_YEAR
+
+# For candidates on the waitlist at simulation start, a registration
+# time is generated such that the candidate has not yet died at simulation start.
+# For the remaining candidates, we assume that they were registered uniformly
+# over the simulation period.
+simdata$candidate_listing_time <- if_else(
+  runif(nrow(simdata)) < INITIAL_WAITLIST_SIZE/TOTAL_NUMBER_OF_CANDIDATES,
+  runif(nrow(simdata), min=-simdata$y, max=0),
+  round(runif(nrow(simdata), min = 0, max = TIME_HORIZON), digits=1)
+)
+simdata$candidate_death_time <- simdata$candidate_listing_time + as.numeric(simdata$y)
+simdata$transplanted <- FALSE
+
+# Make the simulation data into a data.table, and order it descendingly
+# by MELD. Also set an ID to quickly identify candidates.
+setDT(simdata)
+setorder(simdata, -meld_lab, candidate_listing_time)
+simdata$id <- 1:nrow(simdata)
+
+# Print a subset of the simulated data.
+kable(arrange(sample_n(simdata, 25), id), 'html') |>
+  kable_styling('striped')
+```
+
+# Simulate the allocation of donors to candidates.
+
+We simulate patient offer acceptance behavior based on (i) MELD, and (ii)
+candidate sex. For this, we use mixed logistic regression models. The model was estimated
+on ET registry data. For the purpose of illustration,
+we exaggerated the effect of female sex (the real coefficient intercept and
+coefficient on female sex are different).
+
+```{r simulate patient offer acceptance probabilies}
+# For the purpose of illustration, we increase the coefficient on female sex.
+# Estimation on ET registry data yields a coefficient of -0.623.
+# Here, we set it to -1.5.
+acceptance_model_formula <- ~ candidate_sex + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
+fixed_effects <- c(
+  `(Intercept)` = -1,
+  `candidate_sexFemale` = -1.5,
+  `meld_lab` = -0.0133,
+  `f_over_20(meld_lab)` = 0.103,
+  `f_over_30(meld_lab)` = -0.0766
+  )
+variance_component_donor_id <- 1.4087
+
+# Prepare fixed effects for offer acceptance decisions
+X <- model.matrix(acceptance_model_formula, data=simdata)[
+    , names(fixed_effects)
+]
+simdata$lp_fixed_effects <- X %*% fixed_effects
+
+# Show the average offer acceptance probability by sex (without a random effect)
+simdata %>% split(.$candidate_sex) |> map('lp_fixed_effects') |> map(~ mean(boot::inv.logit(.x)))
+```
+In our simulations, females accept only 7% of offers whereas males accept 26% on average.
+
+```{r simulate allocation of donors to patients}
+# Assume donors are reported uniformly over the simulation period.
+times_donor_reported <- round(
+  runif(NUMBER_OF_DONORS, min = 0, max = TIME_HORIZON),
+  digits = 2
+) |> sort()
+
+# Allow organ offer acceptance decisions to be correlated within each donor.
+random_effects_donor_acceptance <- rnorm(
+  NUMBER_OF_DONORS, sd = variance_component_donor_id
+)
+
+# Simulate the allocation of the donors.
+for (i in seq_along(times_donor_reported)) {
+  
+  # Get the time at which the donor was reported.
+  d_reporting_time <- times_donor_reported[[i]]
+  d_bloodgroup <- donor_data$bloodgroups_donor[[i]]
+  d_country <- donor_data$donor_countries[[i]]
+  d_random_effect <- random_effects_donor_acceptance[[i]]
+  
+  # Eligible candidates have to (i) have a waitlist registration,
+  # (ii) not be transplanted already, (iii) listed in the same country as the donor,
+  # and (iv) be blood group compatible with the donor
+  elig_patients <- simdata[
+    between(d_reporting_time, candidate_listing_time, candidate_death_time) &
+      !transplanted &
+      candidate_country == d_country &
+      candidate_bloodgroup %in% BLOOD_TYPE_COMPATIBILITIES[[d_bloodgroup]]
+  ]
+  
+  # Acceptance probabilities for patients
+  elig_patients$prob_accept <- boot::inv.logit(
+    elig_patients$lp_fixed_effects + d_random_effect
+  )
+  
+  # Simulate acceptance for the candidates. The first candidate simulated
+  # to accept the graft gets transplanted.
+  u <- runif(n = nrow(elig_patients))
+  recipient <- elig_patients$id[which.min(elig_patients$prob_accept <= u)]
+  simdata[recipient, c('candidate_transplant_time', 'transplanted') := list(d_reporting_time, TRUE)]
+  
+  if (i %% 2500 == 0) {
+    print(paste0('Simulated ', i, ' placements of liver grafts'))
+  }
+}
+```
+
+Construct the dataset we would have observed with liver allocation.
+
+```{r}
+# Construct censoring time
+simdata$candidate_censoring_time <- pmin(
+  TIME_HORIZON,
+  simdata$candidate_death_time,
+  simdata$candidate_transplant_time,
+  na.rm=TRUE)
+
+# Construct observed outcomes. A waitlist death is observed if the candidate
+# was not transplanted in time. The time-to-event, measured from listing, is
+# the difference between the censoring time and listing time.
+simdata$waitlist_death <- as.integer(!simdata$transplanted & simdata$failed)
+simdata$time_to_event <- simdata$candidate_censoring_time - simdata$candidate_listing_time
+```
+
+
+# Assess disparity in observed waitlist outcomes
+
+```{r}
+# Prepare a dataset, with time-to-event variables truncated to 90 days.
+# This is done commonly when MELD scores are developed.
+simdata_truncated <- simdata |>
+  mutate(
+    transplanted_within_90d = if_else(time_to_event >= 90, 0L, transplanted),
+    death_within_90d = if_else(time_to_event >= 90, 0L, waitlist_death),
+    time_to_event_within_90d = pmin(time_to_event, 90)
+  ) |>
+  select(meld_lab, candidate_sex, transplanted_within_90d, death_within_90d, time_to_event_within_90d)
+
+# Show the frequency of waitlist outcomes within 90 days, by sex.
+left_join(
+  simdata_truncated |>
+    group_by(candidate_sex) |>
+    summarize(
+      `Waitlist deaths within 90 days` = scales::percent(mean(death_within_90d), acc = .1)
+    ),
+  simdata_truncated |>
+    group_by(candidate_sex) |>
+    summarize(
+      `Transplanted within 90 days` = scales::percent(mean(transplanted_within_90d), acc = .1)
+    ),
+  by = join_by('candidate_sex')
+) |>
+  kable('html') |>
+  kableExtra::kable_styling('striped')
+```
+
+In observed waitlist outcomes, there is a large sex disparity with females being less likely to be transplanted and more likely to die on the waiting list.
+
+# Fitting a time-stopped Cox proportional hazards model on observed outcomes
+
+Here, we fit a time-stopped Cox proportional hazards model on observed outcomes,
+which adjusts for candidate sex and MELD. We use a stopping window of 90 days, 
+which is common for the development of medical urgency scores for liver
+allocation (e.g., MELD 3.0 / GEMA-Na). 
+
+
+```{r}
+coxph(
+    Surv(time_to_event_within_90d, death_within_90d) ~ meld_lab + candidate_sex,
+    data=simdata_truncated
+) |>
+  broom::tidy(conf.int=TRUE) |>
+  kable('html') |>
+  kable_styling('striped')
+```
+
+The term for female sex is thus insignificant in this Cox proportional hazards
+model, even though more females than males experience a waitlist death.
+This is expected: transplantation depended in our simulations only on MELD
+and candidate sex. We adjust for these two terms in the waitlist mortality model,
+which makes transplantation an independent censoring mechanism. Consequently, the Cox model can recover the true model for medical urgency. In this true model, sex indeed has no effect on pre-transplant survival.
+
+By making females less likely to accept liver offers than males, we have
+simulated a dataset with a large disparity in waitlist outcomes. However, these
+disparities are not captured by a Cox proportional hazards model which uses
+waitlist mortality as the outcome, because such a model recovers the true model
+for medical urgency (and not observed waitlist deaths, which are determined not only by medical urgency but also by who has access to transplantation). Developing a medical urgency score with a
+Cox proportional hazards model (which is how MELD 3.0 and GEMA-Na were developed)
+is thus not suitable to repair any disparities which are the result of inequities
+in transplantation access. Other methods are needed for this.
+
+# Repeating the simulations
+
+Above simulation was conducted only 1 time. We can run the simulation repeatedly
+to confirm that this results holds in general.
+
+```{r}
+source(here('function_simulate_biased_allocation.R'))
+N_ITERATIONS <- 20
+
+sim_results <- map(
+  2:N_ITERATIONS %>% setNames(nm = .),
+  simulate_biased_allocation
+  )
+
+bind_rows(
+  sim_results, 
+  .id='seed'
+  ) |>
+  filter(str_detect(term, 'sex')) |>
+  kable('html') |>
+  kable_styling('striped')
+```
+
