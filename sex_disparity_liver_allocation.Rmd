@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+here::i_am('.here')
 pacman::p_load(coxed, ggplot2, tibble, dplyr, stringr, here, purrr, kableExtra, data.table)
 options(digits=2)
 source(here('settings.R'))
@@ -116,6 +117,12 @@ simdata$candidate_sex <- factor(
   sample(x=c('Male', 'Female'), size=nrow(simdata), prob = c(0.36, 0.64), replace=TRUE),
   levels = c('Male', 'Female')
 )
+simdata$candidate_height <- if_else(
+  simdata$candidate_sex == 'Male',
+  rnorm(nrow(simdata), mean = 178, sd = 7),
+  rnorm(nrow(simdata), mean = 163, sd = 7)
+)
+
 simdata$candidate_country <- sample(factor(1:7), size = nrow(simdata), prob = P_COUNTRY_RATES, replace=TRUE)
 summary(simdata)
 ```
@@ -124,8 +131,9 @@ This completes the simulated patient data. For each patient, we have:
   2) a time-to-failure (`y`) which was simulated based on the MELD score,
   3) a death indicator (`failed`),
   4) a candidate sex,
-  5) a candidate blood group
-  6) a candidate country of listing
+  5) a candidate height, which depends on sex,
+  6) a candidate blood group
+  7) a candidate country of listing
 
 # Simulate a donor population
 
@@ -190,21 +198,20 @@ kable(arrange(sample_n(simdata, 25), id), 'html') |>
 
 We simulate patient offer acceptance behavior based on (i) MELD, and (ii)
 candidate sex. For this, we use mixed logistic regression models. The model was estimated
-on ET registry data. For the purpose of illustration,
-we exaggerated the effect of female sex (the real coefficient intercept and
-coefficient on female sex are different).
+on ET registry data. For the purpose of illustration, we exaggerate the effect
+of candidate height (the real coefficient was about 0.03).
 
 ```{r simulate patient offer acceptance probabilies}
 # For the purpose of illustration, we increase the coefficient on female sex.
 # Estimation on ET registry data yields a coefficient of -0.623.
 # Here, we set it to -1.5.
-acceptance_model_formula <- ~ candidate_sex + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
+acceptance_model_formula <- ~ I(candidate_height - 170) + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
 fixed_effects <- c(
-  `(Intercept)` = -1,
-  `candidate_sexFemale` = -1.5,
-  `meld_lab` = -0.0133,
-  `f_over_20(meld_lab)` = 0.103,
-  `f_over_30(meld_lab)` = -0.0766
+  `(Intercept)` = -2.1,
+  `I(candidate_height - 170)` = 0.06,
+  `meld_lab` = -0.0146,
+  `f_over_20(meld_lab)` = 0.105,
+  `f_over_30(meld_lab)` = -0.0753
   )
 variance_component_donor_id <- 1.4087
 
@@ -275,7 +282,8 @@ simdata$candidate_censoring_time <- pmin(
   TIME_HORIZON,
   simdata$candidate_death_time,
   simdata$candidate_transplant_time,
-  na.rm=TRUE)
+  na.rm=TRUE
+  )
 
 # Construct observed outcomes. A waitlist death is observed if the candidate
 # was not transplanted in time. The time-to-event, measured from listing, is
@@ -316,7 +324,7 @@ left_join(
   kableExtra::kable_styling('striped')
 ```
 
-In observed waitlist outcomes, there is a large sex disparity with females being less likely to be transplanted and more likely to die on the waiting list.
+In observed waitlist outcomes, there is a sex disparity with females being less likely to be transplanted and more likely to die on the waiting list.
 
 # Fitting a time-stopped Cox proportional hazards model on observed outcomes
 
@@ -340,21 +348,25 @@ The term for female sex is thus insignificant in this Cox proportional hazards
 model, even though more females than males experience a waitlist death.
 This is expected: transplantation depended in our simulations only on MELD
 and candidate sex. We adjust for these two terms in the waitlist mortality model,
-which makes transplantation an independent censoring mechanism. Consequently, the Cox model can recover the true model for medical urgency. In this true model, sex indeed has no effect on pre-transplant survival.
+which makes transplantation an independent censoring mechanism. Consequently, the 
+Cox model can recover the true model for medical urgency. In this true model, 
+sex indeed has no effect on pre-transplant survival.
 
-By making females less likely to accept liver offers than males, we have
-simulated a dataset with a large disparity in waitlist outcomes. However, these
-disparities are not captured by a Cox proportional hazards model which uses
-waitlist mortality as the outcome, because such a model recovers the true model
-for medical urgency (and not observed waitlist deaths, which are determined not only by medical urgency but also by who has access to transplantation). Developing a medical urgency score with a
-Cox proportional hazards model (which is how MELD 3.0 and GEMA-Na were developed)
-is thus not suitable to repair any disparities which are the result of inequities
-in transplantation access. Other methods are needed for this.
+By making short candidates less likely to accept liver offers, we have
+simulated a dataset with a sex disparity in waitlist outcomes because
+females tend to be shorter than males. However, these disparities will not
+show up in the Cox proportional hazards model which uses waitlist mortality
+as the outcome. This is because such a model recovers the true hazard model,
+in which no sex bias is present in our simulations. Disparities in waitlist 
+outcomes can also be the result of inequities in access to transplantation.
+A Cox proportional hazards model which uses waitlist mortality as the outcome
+does not rectify these latter disparities. Other methods are needed for this.
 
 # Repeating the simulations
 
-Above simulation was conducted only 1 time. We can run the simulation repeatedly
-to confirm that this results holds in general.
+The above simulation was conducted only 1 time, and has a point estimate slightly
+above 0 for female sex. We can repeat the simulation to confirm that the sex term
+is insignificant in general (and not greater than 0):
 
 ```{r}
 source(here('function_simulate_biased_allocation.R'))

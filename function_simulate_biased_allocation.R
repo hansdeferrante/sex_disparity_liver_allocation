@@ -44,6 +44,11 @@ simulate_biased_allocation <- function(seed) {
     sample(x=c('Male', 'Female'), size=nrow(simdata), prob = c(0.36, 0.64), replace=TRUE),
     levels = c('Male', 'Female')
   )
+  simdata$candidate_height <- if_else(
+    simdata$candidate_sex == 'Male',
+    rnorm(nrow(simdata), mean = 178, sd = 7),
+    rnorm(nrow(simdata), mean = 163, sd = 7)
+  )
   simdata$candidate_country <- sample(factor(1:7), size = nrow(simdata), prob = P_COUNTRY_RATES, replace=TRUE)
   
   # Simulate donors. Assume that there is a donor shortage of 30%. Also assume

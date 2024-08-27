@@ -11,7 +11,7 @@
 
 <meta name="author" content="Hans de Ferrante" />
 
-<meta name="date" content="2024-08-21" />
+<meta name="date" content="2024-08-27" />
 
 <title>Sex disparity under a fair medical urgency score</title>
 
@@ -577,7 +577,7 @@ display: none;
 <h1 class="title toc-ignore">Sex disparity under a fair medical urgency
 score</h1>
 <h4 class="author">Hans de Ferrante</h4>
-<h4 class="date">2024-08-21</h4>
+<h4 class="date">2024-08-27</h4>
 
 </div>
 
@@ -685,6 +685,12 @@ simdata$candidate_sex &lt;- factor(
   sample(x=c(&#39;Male&#39;, &#39;Female&#39;), size=nrow(simdata), prob = c(0.36, 0.64), replace=TRUE),
   levels = c(&#39;Male&#39;, &#39;Female&#39;)
 )
+simdata$candidate_height &lt;- if_else(
+  simdata$candidate_sex == &#39;Male&#39;,
+  rnorm(nrow(simdata), mean = 178, sd = 7),
+  rnorm(nrow(simdata), mean = 163, sd = 7)
+)
+
 simdata$candidate_country &lt;- sample(factor(1:7), size = nrow(simdata), prob = P_COUNTRY_RATES, replace=TRUE)
 summary(simdata)</code></pre>
 <pre><code>##     meld_lab        y          failed        candidate_bloodgroup
@@ -695,19 +701,20 @@ summary(simdata)</code></pre>
 ##  3rd Qu.:19   3rd Qu.:3035                                       
 ##  Max.   :40   Max.   :3651                                       
 ##                                                                  
-##  candidate_sex  candidate_country
-##  Male  : 6070   1:11165          
-##  Female:10930   2: 1133          
-##                 3: 1709          
-##                 4:  690          
-##                 5: 1151          
-##                 6:  958          
-##                 7:  194</code></pre>
+##  candidate_sex  candidate_height candidate_country
+##  Male  : 6070   Min.   :131      1:11095          
+##  Female:10930   1st Qu.:161      2: 1230          
+##                 Median :167      3: 1652          
+##                 Mean   :168      4:  680          
+##                 3rd Qu.:176      5: 1146          
+##                 Max.   :204      6:  985          
+##                                  7:  212</code></pre>
 <p>This completes the simulated patient data. For each patient, we have:
 1) a MELD score (<code>meld_lab</code>), 2) a time-to-failure
 (<code>y</code>) which was simulated based on the MELD score, 3) a death
 indicator (<code>failed</code>), 4) a candidate sex, 5) a candidate
-blood group 6) a candidate country of listing</p>
+height, which depends on sex, 6) a candidate blood group 7) a candidate
+country of listing</p>
 </div>
 <div id="simulate-a-donor-population" class="section level1">
 <h1>Simulate a donor population</h1>
@@ -732,13 +739,13 @@ donor_data = data.frame(
 
 summary(donor_data)</code></pre>
 <pre><code>##  bloodgroups_donor donor_countries
-##  A :5102           1:5476         
-##  AB: 607           2:1531         
-##  B :1410           3:1668         
-##  O :4781           4:1223         
-##                    5:1095         
-##                    6: 696         
-##                    7: 211</code></pre>
+##  A :5118           1:5334         
+##  AB: 590           2:1568         
+##  B :1379           3:1711         
+##  O :4813           4:1252         
+##                    5:1078         
+##                    6: 737         
+##                    7: 220</code></pre>
 </div>
 <div id="construct-a-waiting-list-consisting-of-all-pre-transplant-candidates" class="section level1">
 <h1>Construct a waiting list consisting of all pre-transplant
@@ -776,7 +783,7 @@ simdata$id &lt;- 1:nrow(simdata)
 # Print a subset of the simulated data.
 kable(arrange(sample_n(simdata, 25), id), &#39;html&#39;) |&gt;
   kable_styling(&#39;striped&#39;)</code></pre>
-<table class="table table-striped" style="color: black; margin-left: auto; margin-right: auto;">
+<table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
 <th style="text-align:right;">
@@ -793,6 +800,9 @@ candidate_bloodgroup
 </th>
 <th style="text-align:left;">
 candidate_sex
+</th>
+<th style="text-align:right;">
+candidate_height
 </th>
 <th style="text-align:left;">
 candidate_country
@@ -817,7 +827,147 @@ id
 40
 </td>
 <td style="text-align:right;">
+49
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Male
+</td>
+<td style="text-align:right;">
+170
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+916
+</td>
+<td style="text-align:right;">
+965
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+82
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+38
+</td>
+<td style="text-align:right;">
+12
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Male
+</td>
+<td style="text-align:right;">
+176
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+1810
+</td>
+<td style="text-align:right;">
+1822
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+347
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+33
+</td>
+<td style="text-align:right;">
+56
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+AB
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+167
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+-26
+</td>
+<td style="text-align:right;">
+30
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+760
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+26
+</td>
+<td style="text-align:right;">
+469
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+O
+</td>
+<td style="text-align:left;">
+Male
+</td>
+<td style="text-align:right;">
+168
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+2529
+</td>
+<td style="text-align:right;">
+2998
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+1695
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
 20
+</td>
+<td style="text-align:right;">
+377
 </td>
 <td style="text-align:left;">
 TRUE
@@ -828,124 +978,136 @@ O
 <td style="text-align:left;">
 Female
 </td>
+<td style="text-align:right;">
+166
+</td>
 <td style="text-align:left;">
-1
+2
 </td>
 <td style="text-align:right;">
-3338
+3252
 </td>
 <td style="text-align:right;">
-3358
+3629
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-250
+3903
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-32
+19
 </td>
 <td style="text-align:right;">
-59
+556
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:left;">
-O
+B
 </td>
 <td style="text-align:left;">
-Male
+Female
+</td>
+<td style="text-align:right;">
+152
 </td>
 <td style="text-align:left;">
 4
 </td>
 <td style="text-align:right;">
-1131
+1040
 </td>
 <td style="text-align:right;">
-1190
+1596
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-877
+4125
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-31
+16
 </td>
 <td style="text-align:right;">
-291
+2022
 </td>
 <td style="text-align:left;">
 TRUE
 </td>
 <td style="text-align:left;">
-O
+B
 </td>
 <td style="text-align:left;">
-Male
+Female
+</td>
+<td style="text-align:right;">
+171
 </td>
 <td style="text-align:left;">
-1
+3
 </td>
 <td style="text-align:right;">
--277
+3604
 </td>
 <td style="text-align:right;">
-14
+5626
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-948
+6894
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-28
+15
 </td>
 <td style="text-align:right;">
-441
+1238
 </td>
 <td style="text-align:left;">
 TRUE
 </td>
 <td style="text-align:left;">
-O
+A
 </td>
 <td style="text-align:left;">
 Male
+</td>
+<td style="text-align:right;">
+183
 </td>
 <td style="text-align:left;">
 5
 </td>
 <td style="text-align:right;">
-442
+865
 </td>
 <td style="text-align:right;">
-883
+2103
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-1319
+7188
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-27
+13
 </td>
 <td style="text-align:right;">
-514
+731
 </td>
 <td style="text-align:left;">
 TRUE
@@ -954,94 +1116,103 @@ TRUE
 O
 </td>
 <td style="text-align:left;">
-Female
+Male
+</td>
+<td style="text-align:right;">
+183
 </td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-897
+-621
 </td>
 <td style="text-align:right;">
-1411
+110
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-1462
+8958
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-27
+13
 </td>
 <td style="text-align:right;">
-68
+529
 </td>
 <td style="text-align:left;">
 TRUE
-</td>
-<td style="text-align:left;">
-B
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-2495
-</td>
-<td style="text-align:right;">
-2563
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-1508
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-25
-</td>
-<td style="text-align:right;">
-343
-</td>
-<td style="text-align:left;">
-FALSE
 </td>
 <td style="text-align:left;">
 A
 </td>
 <td style="text-align:left;">
-Male
+Female
+</td>
+<td style="text-align:right;">
+152
 </td>
 <td style="text-align:left;">
-6
+3
 </td>
 <td style="text-align:right;">
-3486
+-352
 </td>
 <td style="text-align:right;">
-3829
+177
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-1967
+8969
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-23
+13
 </td>
 <td style="text-align:right;">
+1025
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+170
+</td>
+<td style="text-align:left;">
+5
+</td>
+<td style="text-align:right;">
+79
+</td>
+<td style="text-align:right;">
+1104
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+9015
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
 13
+</td>
+<td style="text-align:right;">
+3407
 </td>
 <td style="text-align:left;">
 TRUE
@@ -1052,57 +1223,133 @@ O
 <td style="text-align:left;">
 Male
 </td>
+<td style="text-align:right;">
+178
+</td>
 <td style="text-align:left;">
-6
+1
 </td>
 <td style="text-align:right;">
-3113
+665
 </td>
 <td style="text-align:right;">
-3126
+4072
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-2601
+9179
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-20
+12
 </td>
 <td style="text-align:right;">
-615
+374
 </td>
 <td style="text-align:left;">
-FALSE
+TRUE
 </td>
 <td style="text-align:left;">
-O
+A
 </td>
 <td style="text-align:left;">
 Female
 </td>
+<td style="text-align:right;">
+167
+</td>
 <td style="text-align:left;">
-6
+1
 </td>
 <td style="text-align:right;">
-1635
+660
 </td>
 <td style="text-align:right;">
-2250
+1034
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-3705
+10269
 </td>
 </tr>
 <tr>
 <td style="text-align:right;">
-16
+12
+</td>
+<td style="text-align:right;">
+490
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+158
+</td>
+<td style="text-align:left;">
+2
+</td>
+<td style="text-align:right;">
+1877
+</td>
+<td style="text-align:right;">
+2367
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+10601
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+12
+</td>
+<td style="text-align:right;">
+2982
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+150
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+2748
+</td>
+<td style="text-align:right;">
+5730
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+10849
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+12
 </td>
 <td style="text-align:right;">
 3651
@@ -1114,246 +1361,25 @@ TRUE
 O
 </td>
 <td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-4
-</td>
-<td style="text-align:right;">
-407
-</td>
-<td style="text-align:right;">
-4058
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-6151
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-16
-</td>
-<td style="text-align:right;">
-64
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-A
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-1508
-</td>
-<td style="text-align:right;">
-1572
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-6419
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-16
-</td>
-<td style="text-align:right;">
-1122
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-O
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-4
-</td>
-<td style="text-align:right;">
-2140
-</td>
-<td style="text-align:right;">
-3262
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-6565
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-14
-</td>
-<td style="text-align:right;">
-1565
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-O
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-571
-</td>
-<td style="text-align:right;">
-2136
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-8131
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-14
-</td>
-<td style="text-align:right;">
-1483
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-A
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-2851
-</td>
-<td style="text-align:right;">
-4334
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-8707
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-13
-</td>
-<td style="text-align:right;">
-2017
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-B
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-2
-</td>
-<td style="text-align:right;">
-2735
-</td>
-<td style="text-align:right;">
-4752
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-9750
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-12
-</td>
-<td style="text-align:right;">
-700
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-O
-</td>
-<td style="text-align:left;">
 Male
 </td>
+<td style="text-align:right;">
+180
+</td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-1654
+2976
 </td>
 <td style="text-align:right;">
-2354
+6627
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-10550
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-12
-</td>
-<td style="text-align:right;">
-634
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-A
-</td>
-<td style="text-align:left;">
-Female
-</td>
-<td style="text-align:left;">
-2
-</td>
-<td style="text-align:right;">
-2151
-</td>
-<td style="text-align:right;">
-2785
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-10677
+10916
 </td>
 </tr>
 <tr>
@@ -1361,63 +1387,34 @@ FALSE
 11
 </td>
 <td style="text-align:right;">
-3651
+1772
 </td>
 <td style="text-align:left;">
 TRUE
 </td>
 <td style="text-align:left;">
-B
+O
 </td>
 <td style="text-align:left;">
 Female
 </td>
-<td style="text-align:left;">
-6
-</td>
 <td style="text-align:right;">
-1511
-</td>
-<td style="text-align:right;">
-5162
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-11526
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-11
-</td>
-<td style="text-align:right;">
-1200
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-A
-</td>
-<td style="text-align:left;">
-Female
+167
 </td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-2474
+1750
 </td>
 <td style="text-align:right;">
-3674
+3522
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-11796
+11602
 </td>
 </tr>
 <tr>
@@ -1425,25 +1422,28 @@ FALSE
 10
 </td>
 <td style="text-align:right;">
-1460
+3651
 </td>
 <td style="text-align:left;">
 TRUE
 </td>
 <td style="text-align:left;">
-A
+O
 </td>
 <td style="text-align:left;">
-Female
+Male
+</td>
+<td style="text-align:right;">
+190
 </td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-285
+343
 </td>
 <td style="text-align:right;">
-1745
+3994
 </td>
 <td style="text-align:left;">
 FALSE
@@ -1457,7 +1457,77 @@ FALSE
 9
 </td>
 <td style="text-align:right;">
-313
+1614
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+169
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+944
+</td>
+<td style="text-align:right;">
+2558
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+13519
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+8
+</td>
+<td style="text-align:right;">
+225
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:left;">
+O
+</td>
+<td style="text-align:left;">
+Male
+</td>
+<td style="text-align:right;">
+173
+</td>
+<td style="text-align:left;">
+1
+</td>
+<td style="text-align:right;">
+1842
+</td>
+<td style="text-align:right;">
+2068
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+14985
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+8
+</td>
+<td style="text-align:right;">
+1000
 </td>
 <td style="text-align:left;">
 TRUE
@@ -1468,20 +1538,58 @@ O
 <td style="text-align:left;">
 Female
 </td>
+<td style="text-align:right;">
+165
+</td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-474
+2651
 </td>
 <td style="text-align:right;">
-788
+3651
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-13380
+15283
+</td>
+</tr>
+<tr>
+<td style="text-align:right;">
+8
+</td>
+<td style="text-align:right;">
+3651
+</td>
+<td style="text-align:left;">
+TRUE
+</td>
+<td style="text-align:left;">
+A
+</td>
+<td style="text-align:left;">
+Female
+</td>
+<td style="text-align:right;">
+167
+</td>
+<td style="text-align:left;">
+6
+</td>
+<td style="text-align:right;">
+3639
+</td>
+<td style="text-align:right;">
+7290
+</td>
+<td style="text-align:left;">
+FALSE
+</td>
+<td style="text-align:right;">
+15637
 </td>
 </tr>
 <tr>
@@ -1495,25 +1603,28 @@ FALSE
 TRUE
 </td>
 <td style="text-align:left;">
-B
+AB
 </td>
 <td style="text-align:left;">
-Female
+Male
+</td>
+<td style="text-align:right;">
+177
 </td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
-1106
+2143
 </td>
 <td style="text-align:right;">
-4757
+5794
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-15831
+15978
 </td>
 </tr>
 <tr>
@@ -1532,20 +1643,23 @@ A
 <td style="text-align:left;">
 Female
 </td>
+<td style="text-align:right;">
+151
+</td>
 <td style="text-align:left;">
-1
+4
 </td>
 <td style="text-align:right;">
-1121
+2409
 </td>
 <td style="text-align:right;">
-4772
+6060
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-15834
+16018
 </td>
 </tr>
 <tr>
@@ -1553,63 +1667,34 @@ FALSE
 7
 </td>
 <td style="text-align:right;">
-310
+3651
 </td>
 <td style="text-align:left;">
 TRUE
 </td>
 <td style="text-align:left;">
-O
-</td>
-<td style="text-align:left;">
-Male
-</td>
-<td style="text-align:left;">
-1
-</td>
-<td style="text-align:right;">
-2657
-</td>
-<td style="text-align:right;">
-2967
-</td>
-<td style="text-align:left;">
-FALSE
-</td>
-<td style="text-align:right;">
-16066
-</td>
-</tr>
-<tr>
-<td style="text-align:right;">
-6
-</td>
-<td style="text-align:right;">
-1977
-</td>
-<td style="text-align:left;">
-TRUE
-</td>
-<td style="text-align:left;">
-O
+AB
 </td>
 <td style="text-align:left;">
 Female
 </td>
+<td style="text-align:right;">
+157
+</td>
 <td style="text-align:left;">
 1
 </td>
 <td style="text-align:right;">
--625
+3156
 </td>
 <td style="text-align:right;">
-1352
+6807
 </td>
 <td style="text-align:left;">
 FALSE
 </td>
 <td style="text-align:right;">
-16275
+16148
 </td>
 </tr>
 </tbody>
@@ -1620,18 +1705,18 @@ FALSE
 <p>We simulate patient offer acceptance behavior based on (i) MELD, and
 (ii) candidate sex. For this, we use mixed logistic regression models.
 The model was estimated on ET registry data. For the purpose of
-illustration, we exaggerated the effect of female sex (the real
-coefficient intercept and coefficient on female sex are different).</p>
+illustration, we exaggerate the effect of candidate height (the real
+coefficient was about 0.03).</p>
 <pre class="r"><code># For the purpose of illustration, we increase the coefficient on female sex.
 # Estimation on ET registry data yields a coefficient of -0.623.
 # Here, we set it to -1.5.
-acceptance_model_formula &lt;- ~ candidate_sex + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
+acceptance_model_formula &lt;- ~ I(candidate_height - 170) + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
 fixed_effects &lt;- c(
-  `(Intercept)` = -1,
-  `candidate_sexFemale` = -1.5,
-  `meld_lab` = -0.0133,
-  `f_over_20(meld_lab)` = 0.103,
-  `f_over_30(meld_lab)` = -0.0766
+  `(Intercept)` = -2.1,
+  `I(candidate_height - 170)` = 0.06,
+  `meld_lab` = -0.0146,
+  `f_over_20(meld_lab)` = 0.105,
+  `f_over_30(meld_lab)` = -0.0753
   )
 variance_component_donor_id &lt;- 1.4087
 
@@ -1644,10 +1729,10 @@ simdata$lp_fixed_effects &lt;- X %*% fixed_effects
 # Show the average offer acceptance probability by sex (without a random effect)
 simdata %&gt;% split(.$candidate_sex) |&gt; map(&#39;lp_fixed_effects&#39;) |&gt; map(~ mean(boot::inv.logit(.x)))</code></pre>
 <pre><code>## $Male
-## [1] 0.26
+## [1] 0.16
 ## 
 ## $Female
-## [1] 0.073</code></pre>
+## [1] 0.075</code></pre>
 <p>In our simulations, females accept only 7% of offers whereas males
 accept 26% on average.</p>
 <pre class="r"><code># Assume donors are reported uniformly over the simulation period.
@@ -1706,7 +1791,8 @@ simdata$candidate_censoring_time &lt;- pmin(
   TIME_HORIZON,
   simdata$candidate_death_time,
   simdata$candidate_transplant_time,
-  na.rm=TRUE)
+  na.rm=TRUE
+  )
 
 # Construct observed outcomes. A waitlist death is observed if the candidate
 # was not transplanted in time. The time-to-event, measured from listing, is
@@ -1742,7 +1828,7 @@ left_join(
 ) |&gt;
   kable(&#39;html&#39;) |&gt;
   kableExtra::kable_styling(&#39;striped&#39;)</code></pre>
-<table class="table table-striped" style="color: black; margin-left: auto; margin-right: auto;">
+<table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
 <th style="text-align:left;">
@@ -1762,10 +1848,10 @@ Transplanted within 90 days
 Male
 </td>
 <td style="text-align:left;">
-4.8%
+5.1%
 </td>
 <td style="text-align:left;">
-49.5%
+46.0%
 </td>
 </tr>
 <tr>
@@ -1773,17 +1859,17 @@ Male
 Female
 </td>
 <td style="text-align:left;">
-6.5%
+6.4%
 </td>
 <td style="text-align:left;">
-37.9%
+39.5%
 </td>
 </tr>
 </tbody>
 </table>
-<p>In observed waitlist outcomes, there is a large sex disparity with
-females being less likely to be transplanted and more likely to die on
-the waiting list.</p>
+<p>In observed waitlist outcomes, there is a sex disparity with females
+being less likely to be transplanted and more likely to die on the
+waiting list.</p>
 </div>
 <div id="fitting-a-time-stopped-cox-proportional-hazards-model-on-observed-outcomes" class="section level1">
 <h1>Fitting a time-stopped Cox proportional hazards model on observed
@@ -1800,7 +1886,7 @@ GEMA-Na).</p>
   broom::tidy(conf.int=TRUE) |&gt;
   kable(&#39;html&#39;) |&gt;
   kable_styling(&#39;striped&#39;)</code></pre>
-<table class="table table-striped" style="color: black; margin-left: auto; margin-right: auto;">
+<table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
 <th style="text-align:left;">
@@ -1838,7 +1924,7 @@ meld_lab
 0.00
 </td>
 <td style="text-align:right;">
-41.1
+42.1
 </td>
 <td style="text-align:right;">
 0.00
@@ -1855,22 +1941,22 @@ meld_lab
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
-0.05
+0.09
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
-0.7
+1.3
 </td>
 <td style="text-align:right;">
-0.48
+0.18
 </td>
 <td style="text-align:right;">
--0.09
+-0.04
 </td>
 <td style="text-align:right;">
-0.19
+0.22
 </td>
 </tr>
 </tbody>
@@ -1883,22 +1969,23 @@ two terms in the waitlist mortality model, which makes transplantation
 an independent censoring mechanism. Consequently, the Cox model can
 recover the true model for medical urgency. In this true model, sex
 indeed has no effect on pre-transplant survival.</p>
-<p>By making females less likely to accept liver offers than males, we
-have simulated a dataset with a large disparity in waitlist outcomes.
-However, these disparities are not captured by a Cox proportional
-hazards model which uses waitlist mortality as the outcome, because such
-a model recovers the true model for medical urgency (and not observed
-waitlist deaths, which are determined not only by medical urgency but
-also by who has access to transplantation). Developing a medical urgency
-score with a Cox proportional hazards model (which is how MELD 3.0 and
-GEMA-Na were developed) is thus not suitable to repair any disparities
-which are the result of inequities in transplantation access. Other
-methods are needed for this.</p>
+<p>By making short candidates less likely to accept liver offers, we
+have simulated a dataset with a sex disparity in waitlist outcomes
+because females tend to be shorter than males. However, these
+disparities will not show up in the Cox proportional hazards model which
+uses waitlist mortality as the outcome. This is because such a model
+recovers the true hazard model, in which no sex bias is present in our
+simulations. Disparities in waitlist outcomes can also be the result of
+inequities in access to transplantation. A Cox proportional hazards
+model which uses waitlist mortality as the outcome does not rectify
+these latter disparities. Other methods are needed for this.</p>
 </div>
 <div id="repeating-the-simulations" class="section level1">
 <h1>Repeating the simulations</h1>
-<p>Above simulation was conducted only 1 time. We can run the simulation
-repeatedly to confirm that this results holds in general.</p>
+<p>The above simulation was conducted only 1 time, and has a point
+estimate slightly above 0 for female sex. We can repeat the simulation
+to confirm that the sex term is insignificant in general (and not
+greater than 0):</p>
 <pre class="r"><code>source(here(&#39;function_simulate_biased_allocation.R&#39;))
 N_ITERATIONS &lt;- 20
 
@@ -1914,7 +2001,7 @@ bind_rows(
   filter(str_detect(term, &#39;sex&#39;)) |&gt;
   kable(&#39;html&#39;) |&gt;
   kable_styling(&#39;striped&#39;)</code></pre>
-<table class="table table-striped" style="color: black; margin-left: auto; margin-right: auto;">
+<table class="table table-striped" style="margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
 <th style="text-align:left;">
@@ -1952,22 +2039,22 @@ conf.high
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
--0.06
+0.12
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
--0.83
+1.72
 </td>
 <td style="text-align:right;">
-0.41
+0.09
 </td>
 <td style="text-align:right;">
--0.19
+-0.02
 </td>
 <td style="text-align:right;">
-0.08
+0.25
 </td>
 </tr>
 <tr>
@@ -1978,22 +2065,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
-0.07
+0.13
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
-0.94
+1.99
 </td>
 <td style="text-align:right;">
-0.35
+0.05
 </td>
 <td style="text-align:right;">
--0.07
+0.00
 </td>
 <td style="text-align:right;">
-0.20
+0.26
 </td>
 </tr>
 <tr>
@@ -2004,22 +2091,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
--0.05
+0.00
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
--0.66
+-0.03
 </td>
 <td style="text-align:right;">
-0.51
+0.97
 </td>
 <td style="text-align:right;">
--0.18
+-0.13
 </td>
 <td style="text-align:right;">
-0.09
+0.13
 </td>
 </tr>
 <tr>
@@ -2030,22 +2117,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
-0.02
+0.10
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
-0.26
+1.51
 </td>
 <td style="text-align:right;">
-0.79
+0.13
 </td>
 <td style="text-align:right;">
--0.12
+-0.03
 </td>
 <td style="text-align:right;">
-0.15
+0.24
 </td>
 </tr>
 <tr>
@@ -2056,22 +2143,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
--0.05
+0.05
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
--0.80
+0.72
 </td>
 <td style="text-align:right;">
-0.42
+0.47
 </td>
 <td style="text-align:right;">
--0.19
+-0.08
 </td>
 <td style="text-align:right;">
-0.08
+0.18
 </td>
 </tr>
 <tr>
@@ -2082,22 +2169,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
--0.05
+-0.01
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
--0.80
+-0.19
 </td>
 <td style="text-align:right;">
-0.43
+0.85
 </td>
 <td style="text-align:right;">
--0.18
+-0.14
 </td>
 <td style="text-align:right;">
-0.08
+0.12
 </td>
 </tr>
 <tr>
@@ -2108,22 +2195,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
--0.06
+-0.11
 </td>
 <td style="text-align:right;">
-0.07
+0.06
 </td>
 <td style="text-align:right;">
--0.89
+-1.68
 </td>
 <td style="text-align:right;">
-0.37
+0.09
 </td>
 <td style="text-align:right;">
--0.19
+-0.23
 </td>
 <td style="text-align:right;">
-0.07
+0.02
 </td>
 </tr>
 <tr>
@@ -2134,22 +2221,22 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
-0.08
+0.01
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
-1.17
+0.19
 </td>
 <td style="text-align:right;">
-0.24
+0.85
 </td>
 <td style="text-align:right;">
--0.06
+-0.12
 </td>
 <td style="text-align:right;">
-0.22
+0.14
 </td>
 </tr>
 <tr>
@@ -2166,16 +2253,16 @@ candidate_sexFemale
 0.07
 </td>
 <td style="text-align:right;">
--0.53
+-0.60
 </td>
 <td style="text-align:right;">
-0.59
+0.55
 </td>
 <td style="text-align:right;">
 -0.17
 </td>
 <td style="text-align:right;">
-0.10
+0.09
 </td>
 </tr>
 <tr>
@@ -2186,209 +2273,27 @@ candidate_sexFemale
 candidate_sexFemale
 </td>
 <td style="text-align:right;">
-0.00
+-0.01
 </td>
 <td style="text-align:right;">
 0.07
 </td>
 <td style="text-align:right;">
--0.05
+-0.19
 </td>
 <td style="text-align:right;">
-0.96
+0.85
 </td>
 <td style="text-align:right;">
 -0.14
 </td>
 <td style="text-align:right;">
-0.13
+0.12
 </td>
 </tr>
 <tr>
 <td style="text-align:left;">
 12
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
-0.05
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
-0.78
-</td>
-<td style="text-align:right;">
-0.43
-</td>
-<td style="text-align:right;">
--0.08
-</td>
-<td style="text-align:right;">
-0.19
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-13
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
--0.05
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
--0.74
-</td>
-<td style="text-align:right;">
-0.46
-</td>
-<td style="text-align:right;">
--0.18
-</td>
-<td style="text-align:right;">
-0.08
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-14
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
--0.03
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
--0.46
-</td>
-<td style="text-align:right;">
-0.64
-</td>
-<td style="text-align:right;">
--0.17
-</td>
-<td style="text-align:right;">
-0.10
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-15
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
-0.08
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
-1.20
-</td>
-<td style="text-align:right;">
-0.23
-</td>
-<td style="text-align:right;">
--0.05
-</td>
-<td style="text-align:right;">
-0.22
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-16
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
--0.10
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
--1.47
-</td>
-<td style="text-align:right;">
-0.14
-</td>
-<td style="text-align:right;">
--0.23
-</td>
-<td style="text-align:right;">
-0.03
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-17
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
--0.06
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
--0.89
-</td>
-<td style="text-align:right;">
-0.37
-</td>
-<td style="text-align:right;">
--0.20
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-18
-</td>
-<td style="text-align:left;">
-candidate_sexFemale
-</td>
-<td style="text-align:right;">
-0.04
-</td>
-<td style="text-align:right;">
-0.07
-</td>
-<td style="text-align:right;">
-0.61
-</td>
-<td style="text-align:right;">
-0.54
-</td>
-<td style="text-align:right;">
--0.09
-</td>
-<td style="text-align:right;">
-0.18
-</td>
-</tr>
-<tr>
-<td style="text-align:left;">
-19
 </td>
 <td style="text-align:left;">
 candidate_sexFemale
@@ -2414,7 +2319,137 @@ candidate_sexFemale
 </tr>
 <tr>
 <td style="text-align:left;">
-20
+13
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+0.08
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+1.15
+</td>
+<td style="text-align:right;">
+0.25
+</td>
+<td style="text-align:right;">
+-0.05
+</td>
+<td style="text-align:right;">
+0.21
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+14
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+-0.08
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+-1.18
+</td>
+<td style="text-align:right;">
+0.24
+</td>
+<td style="text-align:right;">
+-0.21
+</td>
+<td style="text-align:right;">
+0.05
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+15
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+0.13
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+1.88
+</td>
+<td style="text-align:right;">
+0.06
+</td>
+<td style="text-align:right;">
+-0.01
+</td>
+<td style="text-align:right;">
+0.26
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+16
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+-0.06
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+-0.87
+</td>
+<td style="text-align:right;">
+0.38
+</td>
+<td style="text-align:right;">
+-0.19
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+17
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+0.05
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+0.79
+</td>
+<td style="text-align:right;">
+0.43
+</td>
+<td style="text-align:right;">
+-0.08
+</td>
+<td style="text-align:right;">
+0.19
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+18
 </td>
 <td style="text-align:left;">
 candidate_sexFemale
@@ -2435,7 +2470,59 @@ candidate_sexFemale
 -0.14
 </td>
 <td style="text-align:right;">
+0.12
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+19
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+0.11
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
+1.56
+</td>
+<td style="text-align:right;">
+0.12
+</td>
+<td style="text-align:right;">
+-0.03
+</td>
+<td style="text-align:right;">
+0.24
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+20
+</td>
+<td style="text-align:left;">
+candidate_sexFemale
+</td>
+<td style="text-align:right;">
+0.01
+</td>
+<td style="text-align:right;">
+0.07
+</td>
+<td style="text-align:right;">
 0.13
+</td>
+<td style="text-align:right;">
+0.89
+</td>
+<td style="text-align:right;">
+-0.12
+</td>
+<td style="text-align:right;">
+0.14
 </td>
 </tr>
 </tbody>
