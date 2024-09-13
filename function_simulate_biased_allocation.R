@@ -29,7 +29,7 @@ simulate_biased_allocation <- function(seed) {
     num.data.frames = 1,
     X=MELD_SCORES-18,
     hazard.fun = function(t) {0.0010954},
-    beta = 0.18
+    beta = exp(0.18)-1
   )
   simdata <- sim$data
   simdata$meld_lab <- simdata$meld_lab + 18
@@ -159,7 +159,17 @@ simulate_biased_allocation <- function(seed) {
     Surv(time_to_event_within_90d, death_within_90d) ~ meld_lab + candidate_sex,
     data=simdata_truncated
   ) |>
-    broom::tidy(conf.int=TRUE))
+    broom::tidy(conf.int=TRUE, digits=3) |>
+    group_by(row_number(), term) |>
+    summarize(
+      estimate = glue::glue('{round(estimate, 3)} [{round(conf.low, 3)}-{round(conf.high, 3)}]'),
+      p.value=p.value
+    ) |>
+    mutate(
+      `True parameter` = recode(term, meld_lab = 0.18, candidate_sexFemale = 0), .after = term
+    ) |>
+    select(-1)
+  )
 }
 
 

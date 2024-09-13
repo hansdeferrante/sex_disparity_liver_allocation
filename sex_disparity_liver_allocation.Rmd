@@ -1,5 +1,5 @@
 ---
-title: "Sex disparity under a fair medical urgency score"
+title: "Sex disparity in liver waitlist outcomes, even if the hazard rate is estimated in an unbiased way"
 author: "Hans de Ferrante"
 date: "`r Sys.Date()`"
 output: html_document
@@ -16,21 +16,31 @@ set.seed(1)
 
 In this notebook, we illustrate with simulation that sex disparity in liver waitlist 
 outcomes can persist, even if prioritization of waitlist candidates is based on a
-medical urgency score which by itself makes unbiased predictions of 
-pre-transplant mortality in males and females. 
+score which by itself makes predictions of a candidates without-transplant
+waitlist mortality without sex bias. 
 
 To this end, we generate realistic populations of liver transplantation candidates
-and donors. Pre-transplant survival is simulated to depend only on MELD.
-To allocate the donor livers to patients, we prioritize candidates on MELD. Thus, we allocate solely on a medical urgency score which is not biased against females.
+and donors. Without-transplant survival is simulated to depend only on MELD (not on sex).
+To allocate the donor livers to patients, we prioritize candidates based on MELD. 
+Thus, our prioritization is based on the without-transplant hazard rate faced
+by the candidate (which is independent of candidate sex).
 
-However, we assume that females are less likely to accept liver graft offers.
-We show that this results in substantial sex disparities in waitlist outcomes, with
-females being both less likely to be transplanted than males, and more likely to die on the waitlist. We then show that when a Cox proportional hazards model is fitted to the observed data with waitlist mortality as the outcome and female sex and MELD as adjustment variables, female sex is insignificant. We explain why this is expected.
+In our simulations, however, we simulate females to be on average 15 centimeters
+shorter than males, and we simulate short candidates to be less likely to accept
+liver offers. We show that this results in substantial sex disparities in waitlist
+outcomes (with 5.3% of males and 6.7% of females dead on the waiting list within
+90 days of listing, and 5 percentage points fewer females transplanted).
+
+When we fit a Cox proportional hazards model to these data, with waitlist mortality
+as the outcome and adjustment for MELD and sex, the sex term is insignificant.
+We explain that this is expected, as the Cox proportional hazards model can recover
+the true without-transplant survival model in this setting (where no sex bias exists).
 
 The conclusions of this are that (i) using a Cox proportional hazards model
-for waitlist mortality is a suitable approach to develop unbiased scores for medical
-urgency, but (ii) scores developed in such a way (MELD 3.0 and GEMA-Na) cannot
-correct for disparities which are the result of inequities in accessing transplantation.
+for waitlist mortality is a suitable approach to develop unbiased scores for the
+relative without-transplant hazard rate, but (ii) scores developed in such a way 
+(e.g., MELD 3.0 and GEMA-Na) cannot correct for disparities which are the result 
+of inequities in accessing transplantation.
 
 # Simulation settings
 
@@ -46,7 +56,7 @@ TOTAL_NUMBER_OF_CANDIDATES <- NUMBER_OF_CANDIDATES_PER_YEAR*NUMBER_YEARS_SIMULAT
 # Simulation of pre-transplant survival in absence of transplantation
 
 First, we simulate pre-transplant survival for candidates based on a
-MELD survival curve, and generate candidate sex independently from these survival times.
+MELD, and generate candidate sex independently from these survival times.
 MELD thus provides an unbiased estimation of waitlist mortality risks for
 males and females.
 
@@ -62,8 +72,9 @@ MELD_SCORES <- data.frame(
 )
 hist(MELD_SCORES)
 
-# We simulate survival based on proportional hazards model. The marginal effect 
-# of MELD is set to 0.18 and we use a constant hazard function. 
+# We simulate without-transplant survival based on a Cox proportional hazards model. 
+# The marginal effect is set to exp(0.18) - 1. With this marginal effect, the coefficient
+# in the Cox proportional hazards model is 0.18. We use a constant hazard function. 
 # These parameters were chosen to correspond well to actual waitlist survival 
 # by MELD in Eurotransplant.
 sim <- sim.survdata(
@@ -72,7 +83,7 @@ sim <- sim.survdata(
   num.data.frames = 1,
   X=MELD_SCORES-18,
   hazard.fun = function(t) {0.0010954},
-  beta = 0.18
+  beta = exp(0.18)-1
 )
 simdata <- sim$data
 simdata$meld_lab <- simdata$meld_lab + 18
@@ -106,7 +117,10 @@ ggplot(
   theme_bw()
 ```
 
-Now simulate other patient characteristics, independently of MELD / survival. Thus, MELD is still a medical urgency score without sex bias.
+Having simulated MELD and the without-transplant survival, we now simulate other patient characteristics.
+We point out that these other characteristics are simulated independently of MELD / survival. 
+Thus, MELD is still a predictor of a candidate's without-transplant hazard rate without sex bias.
+
 
 ```{r}
 simdata$candidate_bloodgroup <- sample(
@@ -128,10 +142,10 @@ summary(simdata)
 ```
 This completes the simulated patient data. For each patient, we have:
   1) a MELD score (`meld_lab`),
-  2) a time-to-failure (`y`) which was simulated based on the MELD score,
-  3) a death indicator (`failed`),
-  4) a candidate sex,
-  5) a candidate height, which depends on sex,
+  2) a time-to-failure-without-transplant (`y`) which was simulated based on the MELD score,
+  3) a death indicator (`failed`), which indicates the candidate would die within 10 years after listing if not transplanted,
+  4) a candidate sex (Male or Female),
+  5) a candidate height, which depends on sex (Females are on average 15cm shorter),
   6) a candidate blood group
   7) a candidate country of listing
 
@@ -162,9 +176,16 @@ summary(donor_data)
 
 # Construct a waiting list consisting of all pre-transplant candidates
 
-Here, we generate candidate listing and delisting times. These are defined in the number of days relative to the simulation start time. For instance, a listing time of 10 and death time of 140 means that this candidate was activated on the waitlist on day 10 of the simulation, and would die 130 (140-10) days after listing unless transplanted.
+Here, we construct candidate listing and delisting times in calendar time. 
+This means that these listing and delisting times are defined in the number
+of days relative to the simulation start time. For instance, a listing time 
+of 10 and death time of 140 means that this candidate was activated on the 
+waitlist on day 10 of the simulation, and would die 130 (140-10) days after 
+listing unless transplanted.
 
-We sort the complete list of candidates descendingly by MELD. This order is used to determine the sequence in which candidates are offered the liver graft.
+We also sort the complete list of candidates descendingly by MELD. 
+This ordering determines the sequence in which candidates are offered
+the liver graft, until a candidate accepts the liver graft.
 
 ```{r}
 # Assume that the initial waitlist size is 70% of the total number
@@ -184,7 +205,7 @@ simdata$candidate_death_time <- simdata$candidate_listing_time + as.numeric(simd
 simdata$transplanted <- FALSE
 
 # Make the simulation data into a data.table, and order it descendingly
-# by MELD. Also set an ID to quickly identify candidates.
+# by MELD.
 setDT(simdata)
 setorder(simdata, -meld_lab, candidate_listing_time)
 simdata$id <- 1:nrow(simdata)
@@ -196,15 +217,16 @@ kable(arrange(sample_n(simdata, 25), id), 'html') |>
 
 # Simulate the allocation of donors to candidates.
 
-We simulate patient offer acceptance behavior based on (i) MELD, and (ii)
-candidate sex. For this, we use mixed logistic regression models. The model was estimated
-on ET registry data. For the purpose of illustration, we exaggerate the effect
-of candidate height (the real coefficient was about 0.03).
+## Simulate offer acceptance behavior
+
+We simulate offer acceptance behavior based on (i) candidate MELD, and (ii) candidate 
+height. For prediction of offer acceptance probabilities, we use logistic 
+regressions with unobserved donor heterogeneity. This model was estimated 
+based on ET registry data. For the purpose of illustration, we exaggerate 
+the effect of candidate height (the real coefficient was about 0.03).
 
 ```{r simulate patient offer acceptance probabilies}
-# For the purpose of illustration, we increase the coefficient on female sex.
-# Estimation on ET registry data yields a coefficient of -0.623.
-# Here, we set it to -1.5.
+# Set up the acceptance formula and fixed effects.
 acceptance_model_formula <- ~ I(candidate_height - 170) + meld_lab + f_over_20(meld_lab) + f_over_30(meld_lab)
 fixed_effects <- c(
   `(Intercept)` = -2.1,
@@ -215,16 +237,26 @@ fixed_effects <- c(
   )
 variance_component_donor_id <- 1.4087
 
-# Prepare fixed effects for offer acceptance decisions
+# Prepare transformed X-data for offer acceptance decisions
 X <- model.matrix(acceptance_model_formula, data=simdata)[
     , names(fixed_effects)
 ]
 simdata$lp_fixed_effects <- X %*% fixed_effects
 
-# Show the average offer acceptance probability by sex (without a random effect)
+# Check the average offer acceptance probability by sex (without a random effect)
 simdata %>% split(.$candidate_sex) |> map('lp_fixed_effects') |> map(~ mean(boot::inv.logit(.x)))
 ```
-In our simulations, females accept only 7% of offers whereas males accept 26% on average.
+With this model, females are less likely to accept a graft than males. 
+The reason for this is that females are shorter than males (on average 15cm),
+which lowers the chance that the candidate accepts a graft offer per our
+graft offer acceptance model.
+
+## Start simulation
+
+Here, we iterate over all simulated donors, and place each donor's liver
+into a candidate. The sequence in which we offer the liver to candidate's
+is based on descending MELD, and graft offer acceptance behavior is simulated
+according to the model above.
 
 ```{r simulate allocation of donors to patients}
 # Assume donors are reported uniformly over the simulation period.
@@ -250,7 +282,7 @@ for (i in seq_along(times_donor_reported)) {
   # Eligible candidates have to (i) have a waitlist registration,
   # (ii) not be transplanted already, (iii) listed in the same country as the donor,
   # and (iv) be blood group compatible with the donor
-  elig_patients <- simdata[
+  eligible_candidates <- simdata[
     between(d_reporting_time, candidate_listing_time, candidate_death_time) &
       !transplanted &
       candidate_country == d_country &
@@ -258,14 +290,14 @@ for (i in seq_along(times_donor_reported)) {
   ]
   
   # Acceptance probabilities for patients
-  elig_patients$prob_accept <- boot::inv.logit(
-    elig_patients$lp_fixed_effects + d_random_effect
+  eligible_candidates$prob_accept <- boot::inv.logit(
+    eligible_candidates$lp_fixed_effects + d_random_effect
   )
   
   # Simulate acceptance for the candidates. The first candidate simulated
   # to accept the graft gets transplanted.
-  u <- runif(n = nrow(elig_patients))
-  recipient <- elig_patients$id[which.min(elig_patients$prob_accept <= u)]
+  u <- runif(n = nrow(eligible_candidates))
+  recipient <- eligible_candidates$id[which.min(eligible_candidates$prob_accept <= u)]
   simdata[recipient, c('candidate_transplant_time', 'transplanted') := list(d_reporting_time, TRUE)]
   
   if (i %% 2500 == 0) {
@@ -274,10 +306,13 @@ for (i in seq_along(times_donor_reported)) {
 }
 ```
 
-Construct the dataset we would have observed with liver allocation.
+## Construct the data we would observe under such liver allocation
+
 
 ```{r}
-# Construct censoring time
+# Construct the calendar-time at which the candidate exits the waitlist.
+# This is the minimum of (i) the maximum time horizon, (ii) the transplant time,
+# and (iii) the day the candidate dies on the waiting list.
 simdata$candidate_censoring_time <- pmin(
   TIME_HORIZON,
   simdata$candidate_death_time,
@@ -291,9 +326,11 @@ simdata$candidate_censoring_time <- pmin(
 simdata$waitlist_death <- as.integer(!simdata$transplanted & simdata$failed)
 simdata$time_to_event <- simdata$candidate_censoring_time - simdata$candidate_listing_time
 ```
+# Assess disparities in waitlist outcomes
 
-
-# Assess disparity in observed waitlist outcomes
+Here, we assess sex disparity in waitlist outcomes. To this end, we summarize
+by sex the fraction of candidates who (i) is transplanted within 90 days, 
+and (ii) died on the waiting list within 90 days.
 
 ```{r}
 # Prepare a dataset, with time-to-event variables truncated to 90 days.
@@ -324,43 +361,52 @@ left_join(
   kableExtra::kable_styling('striped')
 ```
 
-In observed waitlist outcomes, there is a sex disparity with females being less likely to be transplanted and more likely to die on the waiting list.
+We observe that there is sex disparity in waitlist outcomes;
+females are both less likely to have been transplanted within 90 days,
+and more likely to have died within 90 days of listing.
 
-# Fitting a time-stopped Cox proportional hazards model on observed outcomes
+# Fitting a Cox proportional hazards model on observed outcomes
 
-Here, we fit a time-stopped Cox proportional hazards model on observed outcomes,
-which adjusts for candidate sex and MELD. We use a stopping window of 90 days, 
-which is common for the development of medical urgency scores for liver
-allocation (e.g., MELD 3.0 / GEMA-Na). 
-
+Here, we fit a Cox proportional hazards model on the observed data. This model
+adjusts for candidate sex and MELD, and candidates without an event 90 days
+after listing are censored This approach is commonly used to develop MELD scores,
+including MELD 3.0 and GEMA-Na).
 
 ```{r}
 coxph(
     Surv(time_to_event_within_90d, death_within_90d) ~ meld_lab + candidate_sex,
     data=simdata_truncated
 ) |>
-  broom::tidy(conf.int=TRUE) |>
+  broom::tidy(conf.int=TRUE, digits=3) |>
+  group_by(row_number(), term) |>
+  summarize(
+    estimate = glue::glue('{round(estimate, 3)} [{round(conf.low, 3)}-{round(conf.high, 3)}]'),
+    p.value=p.value
+  ) |>
+  mutate(
+    `True parameter` = recode(term, meld_lab = 0.18, candidate_sexFemale = 0), .after = term
+  ) |>
+  select(-1) |>
   kable('html') |>
   kable_styling('striped')
 ```
 
-The term for female sex is thus insignificant in this Cox proportional hazards
+Interestingly, the term for female sex is insignificant in this Cox proportional hazards
 model, even though more females than males experience a waitlist death.
 This is expected: transplantation depended in our simulations only on MELD
 and candidate sex. We adjust for these two terms in the waitlist mortality model,
 which makes transplantation an independent censoring mechanism. Consequently, the 
-Cox model can recover the true model for medical urgency. In this true model, 
-sex indeed has no effect on pre-transplant survival.
+Cox model can recover the true model for the without-transplant hazard rate.
+In this true model, sex indeed has no effect.
 
 By making short candidates less likely to accept liver offers, we have
 simulated a dataset with a sex disparity in waitlist outcomes because
 females tend to be shorter than males. However, these disparities will not
 show up in the Cox proportional hazards model which uses waitlist mortality
-as the outcome. This is because such a model recovers the true hazard model,
-in which no sex bias is present in our simulations. Disparities in waitlist 
-outcomes can also be the result of inequities in access to transplantation.
-A Cox proportional hazards model which uses waitlist mortality as the outcome
-does not rectify these latter disparities. Other methods are needed for this.
+as the outcome. This is because a Cox proportional hazards model does not capture
+any excess waitlist mortality which is the result from inequities in access to
+transplantation. Other methods are needed to rectify disparities originating
+from inequities in access to transplantation.
 
 # Repeating the simulations
 
@@ -381,6 +427,8 @@ bind_rows(
   sim_results, 
   .id='seed'
   ) |>
+  ungroup() |>
+  select(-one_of('row_number()')) |>
   filter(str_detect(term, 'sex')) |>
   kable('html') |>
   kable_styling('striped')
